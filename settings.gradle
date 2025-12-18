@@ -1,0 +1,7 @@
+pluginManagement {
+
+}
+
+rootProject.name = 'event-example'
+include "event-service"
+include "event-service-api"

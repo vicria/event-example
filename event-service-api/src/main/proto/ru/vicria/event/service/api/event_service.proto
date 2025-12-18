@@ -1,0 +1,19 @@
+syntax = "proto3";
+
+option java_package = "ru.vicria.event.service.api";
+option java_outer_classname = "EventServiceApi";
+option java_multiple_files = true;
+
+service EventService {
+  rpc ListenEvent (ListenEventRequest) returns (stream Event);
+}
+
+message ListenEventRequest {
+  string traceId = 1;
+  int64 starting_from = 2;
+}
+
+message Event {
+  int64 notification_time = 1;
+  string message = 2;
+}
