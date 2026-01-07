@@ -2,6 +2,7 @@ package ru.vicria.event.service;
 
 import org.slf4j.LoggerFactory;
 import org.slf4j.Logger;
+import ru.vicria.event.service.api.EventServiceImpl;
 import ru.vicria.event.service.config.EventRepositoryConfiguration;
 
 import java.util.concurrent.TimeUnit;
@@ -22,11 +23,10 @@ public class EventApp {
                     .subscribeOn(UncaughtExceptionSchedulers.newSingle("event-listener-monitor", true))
                     .doOnNext(e -> logger.info("Listener gor an message {}", e))
                     .doOnError(e -> logger.error("Error on listener ", e))
-                    .doOnTerminate(()->{
+                    .doOnTerminate(() -> {
                         logger.warn("Listener has been finished, shutting down...");
                         System.exit(1);
                     }).subscribe();
-
             waitTermination();
         } catch (Exception e) {
             logger.error("Failed to start {}.", CLIENT_ID, e);

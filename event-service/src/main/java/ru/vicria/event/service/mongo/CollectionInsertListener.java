@@ -6,6 +6,5 @@ import reactor.core.publisher.Flux;
 
 public interface CollectionInsertListener {
     void start(MongoCollection<Document> collection);
-
     Flux<Document> insertedDocumentFlux();
 }
