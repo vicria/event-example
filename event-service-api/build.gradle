@@ -11,11 +11,13 @@ repositories {
 }
 
 dependencies {
-    implementation 'com.google.protobuf:protobuf-java:3.25.3'
+    implementation 'com.google.protobuf:protobuf-java:4.28.2'
 
     implementation 'io.grpc:grpc-stub:1.63.0'
     implementation 'io.grpc:grpc-protobuf:1.63.0'
-    implementation 'io.grpc:grpc-netty-shaded:1.63.0'
+    implementation 'io.grpc:grpc-netty-shaded:1.75.0'
+    implementation "io.projectreactor:reactor-core:3.6.5"
+    implementation "com.salesforce.servicelibs:reactor-grpc-stub:1.2.4"
 
     compileOnly 'org.apache.tomcat:annotations-api:6.0.53'
 }
@@ -29,12 +31,16 @@ protobuf {
         grpc {
             artifact = "io.grpc:protoc-gen-grpc-java:1.63.0"
         }
+        reactor {
+            artifact = "com.salesforce.servicelibs:reactor-grpc:1.2.4"
+        }
     }
 
     generateProtoTasks {
         all().each { task ->
             task.plugins {
                 grpc {}
+                reactor {}
             }
         }
     }

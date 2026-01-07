@@ -8,8 +8,13 @@ service EventService {
   rpc ListenEvent (ListenEventRequest) returns (stream Event);
 }
 
-message ListenEventRequest {
+message RequestId {
   string traceId = 1;
+  string clientId = 2;
+}
+
+message ListenEventRequest {
+  RequestId requestId = 1;
   int64 starting_from = 2;
 }
 
