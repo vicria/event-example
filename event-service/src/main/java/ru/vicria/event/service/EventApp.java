@@ -21,7 +21,7 @@ public class EventApp {
 
             repository.listenSince(System.currentTimeMillis())
                     .subscribeOn(UncaughtExceptionSchedulers.newSingle("event-listener-monitor", true))
-                    .doOnNext(e -> logger.info("Listener gor an message {}", e))
+                    .doOnNext(e -> logger.info("Process a message {}", e))
                     .doOnError(e -> logger.error("Error on listener ", e))
                     .doOnTerminate(() -> {
                         logger.warn("Listener has been finished, shutting down...");
