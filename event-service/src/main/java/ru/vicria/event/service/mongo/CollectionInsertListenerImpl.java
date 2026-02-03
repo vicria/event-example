@@ -24,6 +24,7 @@ public class CollectionInsertListenerImpl implements CollectionInsertListener {
     private static final Long DELAY = 10L;
 
     private final ScheduledExecutorService executorService;
+    // TODO: try with different sinks (no buffers) on no sinks at all
     private final Sinks.Many<Document> publisher = Sinks.many().multicast().onBackpressureBuffer(1024);
 
     private final AtomicReference<BsonTimestamp> startTsRef = new AtomicReference<>();

@@ -10,6 +10,9 @@ import org.bson.Document;
 import org.slf4j.LoggerFactory;
 import org.slf4j.Logger;
 import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Schedulers;
+import ru.vicria.event.service.api.AnalyticsEvent;
 import ru.vicria.event.service.api.Event;
 
 import static ru.vicria.event.service.mongo.EventField.MESSAGE;
@@ -39,9 +42,22 @@ public class EventRepositoryImpl {
                 .find(Filters.gt(NOTIFICATION_TS.name(), timestamp))
                 .sort(Sorts.descending(NOTIFICATION_TS.name()));
 
+        // TODO: check what if not merge?
         return Flux.merge(
                 Flux.fromIterable(result),
+                // TODO: what if Flux isn't infinite and these is no insertListener flux?
                 insertListener.insertedDocumentFlux().filter(doc -> NOTIFICATION_TS.from(doc) > timestamp)
         ).map(EventParser::parse);
+    }
+
+    public Mono<Event> saveOne(AnalyticsEvent analyticsEvent) {
+        Event event = analyticsEvent.getEvent();
+        Document document = EventParser.toDocument(event);
+
+        return Mono.fromCallable(() -> {
+            mongoCollection.insertOne(document);
+            return event;
+        }).subscribeOn(Schedulers.boundedElastic());
+
     }
 }

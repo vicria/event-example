@@ -1,7 +1,6 @@
 package ru.vicria.event.service.config;
 
 import com.mongodb.MongoClientSettings;
-import com.mongodb.client.MongoClient;
 import com.mongodb.client.MongoClients;
 import ru.vicria.event.service.mongo.CollectionInsertListenerImpl;
 import ru.vicria.event.service.mongo.EventRepositoryImpl;
@@ -17,7 +16,7 @@ public class EventRepositoryConfiguration {
     public EventRepositoryConfiguration() {
         var clientSettings = MongoClientSettings.builder()
                 .applicationName(CLIENT_ID)
-                //todo
+                //TODO: check different settings
                 .build();
         var mongoClient = MongoClients.create(clientSettings);
         var mongoDataBase = mongoClient.getDatabase("event-example");

@@ -1,7 +1,6 @@
 package ru.vicria.event.service.api;
 
 import io.grpc.BindableService;
-import io.grpc.Status;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Flux;
@@ -21,29 +20,33 @@ public class EventServiceImpl extends ReactorEventServiceGrpc.EventServiceImplBa
     @Override
     public Flux<Event> listenEvent(Mono<ListenEventRequest> request) {
         return ReactiveRequestLogger.with(logger)
-                .forRequest("ListenEvent", request, ListenEventRequest::getRequestId)
-                .produce(req -> repository.listenSince(req.getStartingFrom()))
+                .forRequest("ListenEvent", ListenEventRequest::getRequestId)
+                .produce(request, req -> repository.listenSince(req.getStartingFrom()))
                 .doOnComplete(() -> logger.info("Event sent to consumer {}", request));
     }
 
     @Override
-    public Mono<EventAnalysisResult> analyzeEvents(Flux<AnalyticsEventRequest> requests) {
-        return requests
-                .reduce(new Acc(null, 0L, 0L, 0L), Acc::add)
-                .map(acc -> {
-                    if (acc.requestId() == null) {
-                        throw Status.INVALID_ARGUMENT
-                                .withDescription("At least one AnalyticsEventRequest is required")
-                                .asRuntimeException();
-                    }
+    public Mono<EventAnalysisResult> analyzeEvents(Flux<AnalyticsEvent> requests) {
+        return ReactiveRequestLogger.with(logger)
+                .forRequest("analyzeEvents", AnalyticsEvent::getRequestId)
+                .produceMonoReduced(
+                        requests,
+                        flux -> flux.flatMap(repository::saveOne),
+                        requestId -> EventAnalysisResult.newBuilder().setRequestId(requestId),
+                        EventServiceImpl::add,
+                        EventAnalysisResult.Builder::build
+                );
+    }
 
-                    return EventAnalysisResult.newBuilder()
-                            .setRequestId(acc.requestId())
-                            .setTotalEvents(acc.totalEvents())
-                            .setLatestNotificationTime(acc.latestNotificationTime())
-                            .setTotalMessageChars(acc.totalMessageChars())
-                            .build();
-                });
+    private static EventAnalysisResult.Builder add(EventAnalysisResult.Builder builder, Event event) {
+        long totalEvents = builder.getTotalEvents() + 1;
+        long latestTs = Math.max(builder.getLatestNotificationTime(), event.getNotificationTime());
+        long totalChars = builder.getTotalMessageChars() + event.getMessage().length();
+
+        return builder
+                .setTotalEvents(totalEvents)
+                .setLatestNotificationTime(latestTs)
+                .setTotalMessageChars(totalChars);
     }
 
 }
