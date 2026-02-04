@@ -1,5 +1,6 @@
 package ru.vicria.event.service.mongo;
 
+import com.mongodb.client.FindIterable;
 import com.mongodb.client.MongoCollection;
 import com.mongodb.client.MongoDatabase;
 import com.mongodb.client.model.Filters;
@@ -14,6 +15,10 @@ import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 import ru.vicria.event.service.api.AnalyticsEvent;
 import ru.vicria.event.service.api.Event;
+import ru.vicria.event.service.api.TailEventsRequest;
+
+import java.util.Collections;
+import java.util.List;
 
 import static ru.vicria.event.service.mongo.EventField.MESSAGE;
 import static ru.vicria.event.service.mongo.EventField.NOTIFICATION_TS;
@@ -30,9 +35,16 @@ public class EventRepositoryImpl {
             CollectionInsertListener insertListener
     ) {
         mongoCollection = mongoDatabase.getCollection(collectionName.toLowerCase());
+
         mongoCollection.createIndex(
                 Indexes.ascending(MESSAGE.name(), NOTIFICATION_TS.name()),
                 new IndexOptions().unique(true).name("event_name_idx"));
+
+        mongoCollection.createIndex(
+                Indexes.ascending(NOTIFICATION_TS.name()),
+                new IndexOptions().name("notification_ts_idx")
+        );
+
         this.insertListener = insertListener;
         insertListener.start(mongoCollection);
     }
@@ -59,5 +71,51 @@ public class EventRepositoryImpl {
             return event;
         }).subscribeOn(Schedulers.boundedElastic());
 
+    }
+
+    public Flux<Event> tailThenListen(TailEventsRequest req) {
+        long minNotificationTime = req.getMinNotificationTime();
+        int tailSize = req.getTailSize();
+        int maxEvents = req.getMaxEvents();
+
+        Mono<List<Event>> tailListMono =
+                tailSize <= 0
+                        ? Mono.just(List.of())
+                        : fetchTailDescending(minNotificationTime, tailSize)
+                        .collectList()
+                        .map(list -> {
+                            Collections.reverse(list);
+                            return list;
+                        });
+
+        Flux<Event> combined = tailListMono.flatMapMany(tailList -> {
+            long watermark = tailList.isEmpty()
+                    ? minNotificationTime
+                    : tailList.get(tailList.size() - 1).getNotificationTime();
+
+            Flux<Event> tailFlux = Flux.fromIterable(tailList);
+
+            Flux<Event> liveFlux = insertListener.insertedDocumentFlux()
+                    .filter(doc -> NOTIFICATION_TS.from(doc) > watermark)
+                    .map(EventParser::parse);
+
+            return tailFlux.concatWith(liveFlux);
+        });
+
+        if (maxEvents > 0) {
+            return combined.take(maxEvents);
+        }
+
+        return combined;
+    }
+
+    private Flux<Event> fetchTailDescending(long minNotificationTime, int lastEventsNumber) {
+        FindIterable<Document> documents = mongoCollection.find(Filters.gt(NOTIFICATION_TS.name(), minNotificationTime))
+                .sort(Sorts.descending(NOTIFICATION_TS.name()))
+                .limit(lastEventsNumber);
+
+        return Flux.fromIterable(documents)
+                .subscribeOn(Schedulers.boundedElastic())
+                .map(EventParser::parse);
     }
 }

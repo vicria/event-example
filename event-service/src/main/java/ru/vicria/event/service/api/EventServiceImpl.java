@@ -38,6 +38,14 @@ public class EventServiceImpl extends ReactorEventServiceGrpc.EventServiceImplBa
                 );
     }
 
+    @Override
+    public Flux<Event> tailEvents(Mono<TailEventsRequest> request) {
+        return ReactiveRequestLogger.with(logger)
+                .forRequest("tailEvents", TailEventsRequest::getRequestId)
+                .produce(request, repository::tailThenListen)
+                .doOnComplete(() -> logger.info("Tail Events completed for request {}", request));
+    }
+
     private static EventAnalysisResult.Builder add(EventAnalysisResult.Builder builder, Event event) {
         long totalEvents = builder.getTotalEvents() + 1;
         long latestTs = Math.max(builder.getLatestNotificationTime(), event.getNotificationTime());
