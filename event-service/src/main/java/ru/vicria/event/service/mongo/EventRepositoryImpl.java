@@ -1,11 +1,14 @@
 package ru.vicria.event.service.mongo;
 
+import com.mongodb.MongoBulkWriteException;
 import com.mongodb.client.FindIterable;
 import com.mongodb.client.MongoCollection;
 import com.mongodb.client.MongoDatabase;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.IndexOptions;
 import com.mongodb.client.model.Indexes;
+import com.mongodb.client.model.ReplaceOneModel;
+import com.mongodb.client.model.ReplaceOptions;
 import com.mongodb.client.model.Sorts;
 import org.bson.Document;
 import org.slf4j.LoggerFactory;
@@ -60,6 +63,36 @@ public class EventRepositoryImpl {
                 // TODO: what if Flux isn't infinite and these is no insertListener flux?
                 insertListener.insertedDocumentFlux().filter(doc -> NOTIFICATION_TS.from(doc) > timestamp)
         ).map(EventParser::parse);
+    }
+
+    public void insert(List<Event> events) {
+        var operations = events.stream()
+                .map(event -> {
+                    var filter = Filters.and(
+                            Filters.eq(MESSAGE.name(), event.getMessage()),
+                            Filters.eq(NOTIFICATION_TS.name(), event.getNotificationTime())
+                    );
+                    return new ReplaceOneModel<>(
+                            filter,
+                            EventParser.toDocument(event),
+                            new ReplaceOptions().upsert(true)
+                    );
+                })
+                .toList();
+
+        try {
+            mongoCollection.bulkWrite(operations);
+//            if (result.wasAcknowledged()) {
+//                //we can do emit FAIL_FAST
+//            }
+        } catch (MongoBulkWriteException e) {
+            if (e.getWriteErrors().stream().findAny().isPresent()
+                    && e.getWriteErrors().stream().findAny().get().getCode() == 1100) {
+                logger.info("Duplicate key");
+            } else {
+                throw e;
+            }
+        }
     }
 
     public Mono<Event> saveOne(AnalyticsEvent analyticsEvent) {
