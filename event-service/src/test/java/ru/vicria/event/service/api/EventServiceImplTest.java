@@ -17,6 +17,7 @@ import static org.assertj.core.api.BDDAssertions.thenThrownBy;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
 
 @ExtendWith(MockitoExtension.class)
 class EventServiceImplTest {
@@ -88,15 +89,18 @@ class EventServiceImplTest {
                     .setClientId("client-1")
                     .build();
 
-            AnalyticsEventRequest first = AnalyticsEventRequest.newBuilder()
+            AnalyticsEvent first = AnalyticsEvent.newBuilder()
                     .setRequestId(requestId)
                     .setEvent(Event.newBuilder().setNotificationTime(10L).setMessage("hi").build())
                     .build();
 
-            AnalyticsEventRequest second = AnalyticsEventRequest.newBuilder()
+            AnalyticsEvent second = AnalyticsEvent.newBuilder()
                     .setRequestId(requestId)
                     .setEvent(Event.newBuilder().setNotificationTime(40L).setMessage("world").build())
                     .build();
+
+            given(repository.saveOne(first)).willReturn(Mono.just(first.getEvent()));
+            given(repository.saveOne(second)).willReturn(Mono.just(second.getEvent()));
 
             // when
             EventAnalysisResult result = eventService.analyzeEvents(Flux.just(first, second)).block();
@@ -107,7 +111,6 @@ class EventServiceImplTest {
             then(result.getTotalEvents()).isEqualTo(2L);
             then(result.getLatestNotificationTime()).isEqualTo(40L);
             then(result.getTotalMessageChars()).isEqualTo(7L);
-            verifyNoInteractions(repository);
         }
 
         @Test
@@ -118,9 +121,11 @@ class EventServiceImplTest {
             // then
             thenThrownBy(() -> eventService.analyzeEvents(Flux.empty()).block())
                     .isInstanceOf(StatusRuntimeException.class)
-                    .hasMessageContaining("At least one AnalyticsEventRequest is required")
-                    .satisfies(ex -> then(((StatusRuntimeException) ex).getStatus().getCode())
-                            .isEqualTo(Status.INVALID_ARGUMENT.getCode()));
+                    .satisfies(ex -> {
+                        StatusRuntimeException sre = (StatusRuntimeException) ex;
+                        then(sre.getStatus().getCode()).isEqualTo(Status.INVALID_ARGUMENT.getCode());
+                        then(sre.getStatus().getDescription()).contains("At least one AnalyticsEventRequest is required");
+                    });
 
             verifyNoInteractions(repository);
         }
@@ -128,26 +133,30 @@ class EventServiceImplTest {
         @Test
         void shouldFailWithStatusRuntimeException_WhenRequestIdsDiffer() {
             // given
-            AnalyticsEventRequest first = AnalyticsEventRequest.newBuilder()
+            AnalyticsEvent first = AnalyticsEvent.newBuilder()
                     .setRequestId(RequestId.newBuilder().setTraceId("t1").setClientId("c1").build())
                     .setEvent(Event.newBuilder().setNotificationTime(10L).setMessage("hi").build())
                     .build();
 
-            AnalyticsEventRequest second = AnalyticsEventRequest.newBuilder()
+            AnalyticsEvent second = AnalyticsEvent.newBuilder()
                     .setRequestId(RequestId.newBuilder().setTraceId("t2").setClientId("c1").build())
                     .setEvent(Event.newBuilder().setNotificationTime(20L).setMessage("ho").build())
                     .build();
 
+            given(repository.saveOne(first)).willReturn(Mono.just(first.getEvent()));
 
             // when
             // then
             thenThrownBy(() -> eventService.analyzeEvents(Flux.just(first, second)).block())
                     .isInstanceOf(StatusRuntimeException.class)
-                    .hasMessageContaining("All AnalyticsEventRequest messages must have the same request_id")
-                    .satisfies(ex -> then(((StatusRuntimeException) ex).getStatus().getCode())
-                            .isEqualTo(Status.INVALID_ARGUMENT.getCode()));
+                    .satisfies(ex -> {
+                        StatusRuntimeException sre = (StatusRuntimeException) ex;
+                        then(sre.getStatus().getCode()).isEqualTo(Status.INVALID_ARGUMENT.getCode());
+                        then(sre.getStatus().getDescription()).contains("All request messages must have the same request_id");
+                    });
 
-            verifyNoInteractions(repository);
+            verify(repository).saveOne(first);
+            verifyNoMoreInteractions(repository);
         }
     }
 }

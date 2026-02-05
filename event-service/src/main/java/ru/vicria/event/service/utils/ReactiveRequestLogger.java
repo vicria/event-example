@@ -46,8 +46,8 @@ public class ReactiveRequestLogger<T> {
             Function<A, R> finish) {
         return requests.switchOnFirst((firstSignal, flux) -> {
             if (!firstSignal.hasValue()) {
-                return Flux.error(Status.INVALID_ARGUMENT
-                        .withDescription("At least one request message is required")
+                return Mono.error(Status.INVALID_ARGUMENT
+                        .withDescription("At least one AnalyticsEventRequest is required")
                         .asRuntimeException());
             }
 

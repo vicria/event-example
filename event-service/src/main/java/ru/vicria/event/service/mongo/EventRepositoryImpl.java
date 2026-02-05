@@ -109,12 +109,12 @@ public class EventRepositoryImpl {
         return combined;
     }
 
-    private Flux<Event> fetchTailDescending(long minNotificationTime, int lastEventsNumber) {
+    private Flux<Event> fetchTailDescending(long minNotificationTime, int tailList) {
         FindIterable<Document> documents = mongoCollection.find(Filters.gt(NOTIFICATION_TS.name(), minNotificationTime))
                 .sort(Sorts.descending(NOTIFICATION_TS.name()))
-                .limit(lastEventsNumber);
+                .limit(tailList);
 
-        return Flux.fromIterable(documents)
+        return Flux.fromIterable(documents::iterator)
                 .subscribeOn(Schedulers.boundedElastic())
                 .map(EventParser::parse);
     }
