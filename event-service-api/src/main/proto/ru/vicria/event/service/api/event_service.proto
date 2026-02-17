@@ -6,15 +6,36 @@ option java_multiple_files = true;
 
 service EventService {
   rpc ListenEvent (ListenEventRequest) returns (stream Event);
+  rpc AnalyzeEvents (stream AnalyticsEvent) returns (EventAnalysisResult);
+  rpc TailEvents (TailEventsRequest) returns (stream Event);
+}
+
+message TailEventsRequest {
+    RequestId request_id = 1;
+    int32 tail_size = 2;
+    int64 min_notification_time = 3;
+    int32 max_events = 4;
+}
+
+message AnalyticsEvent {
+    RequestId request_id = 1;
+    Event event = 2;
+}
+
+message EventAnalysisResult {
+    RequestId request_id = 1;
+    int64 total_events = 2;
+    int64 latest_notification_time = 3;
+    int64 total_message_chars = 4;
 }
 
 message RequestId {
-  string traceId = 1;
-  string clientId = 2;
+  string trace_id = 1;
+  string client_id = 2;
 }
 
 message ListenEventRequest {
-  RequestId requestId = 1;
+  RequestId request_id = 1;
   int64 starting_from = 2;
 }
 

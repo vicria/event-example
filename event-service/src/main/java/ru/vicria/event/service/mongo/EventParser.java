@@ -1,6 +1,7 @@
 package ru.vicria.event.service.mongo;
 
 import org.bson.Document;
+import ru.vicria.event.service.api.AnalyticsEvent;
 import ru.vicria.event.service.api.Event;
 
 public final class EventParser {
