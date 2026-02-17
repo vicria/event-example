@@ -12,7 +12,7 @@ import static ru.vicria.event.service.EventApp.CLIENT_ID;
 
 public class EventRepositoryConfiguration {
 
-    private static final String CONNECTION_STRING = "mongodb://mongo:27017";
+    private static final String CONNECTION_STRING = "mongodb://localhost:27017";
     private static final String COLLECTION_NAME = "event-example";
 
     private final EventRepositoryImpl repository;
