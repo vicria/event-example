@@ -52,17 +52,20 @@ public class EventRepositoryImpl {
         insertListener.start(mongoCollection);
     }
 
+    // TODO: check what if not merge?
+    // TODO: what if Flux isn't infinite and these is no insertListener flux?
     public Flux<Event> listenSince(long timestamp) {
         var result = mongoCollection
                 .find(Filters.gt(NOTIFICATION_TS.name(), timestamp))
                 .sort(Sorts.descending(NOTIFICATION_TS.name()));
+        Flux<Document> queryFlux = Flux.fromIterable(result);
 
-        // TODO: check what if not merge?
-        return Flux.merge(
-                Flux.fromIterable(result),
-                // TODO: what if Flux isn't infinite and these is no insertListener flux?
-                insertListener.insertedDocumentFlux().filter(doc -> NOTIFICATION_TS.from(doc) > timestamp)
-        ).map(EventParser::parse);
+        Flux<Document> liveFlux = insertListener.insertedDocumentFlux()
+                .filter(doc -> NOTIFICATION_TS.from(doc) > timestamp);
+
+        return Flux.merge(queryFlux, liveFlux)
+                .map(EventParser::parse)
+                .distinct(e -> e.getMessage() + "|" + e.getNotificationTime());
     }
 
     public void insert(List<Event> events) {
